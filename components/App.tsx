@@ -684,24 +684,41 @@ function GardenBg({ background }: { background: string }) {
 /* ─── Login ──────────────────────────────────────────────────────────────── */
 
 function LoginScreen({
-  onLogin, onRegister, gardenBackground,
+  onLogin,
+  onRegister,
+  gardenBackground,
+  passwordResetToken,
+  onClearPasswordResetToken,
 }: {
   onLogin: (email: string, password: string) => Promise<void>
   onRegister: (email: string, name: string, password: string) => Promise<void>
   gardenBackground: string
+  passwordResetToken: string | null
+  onClearPasswordResetToken: () => void
 }) {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset'>('login')
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (passwordResetToken) {
+      setMode('reset')
+      setError(null)
+      setInfo(null)
+    }
+  }, [passwordResetToken])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     try {
       setBusy(true)
       setError(null)
+      setInfo(null)
       if (mode === 'login') {
         await onLogin(email, password)
       } else {
@@ -713,6 +730,57 @@ function LoginScreen({
       setBusy(false)
     }
   }
+
+  const handleForgotSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!email.trim()) {
+      setError('Ingresá tu email.')
+      return
+    }
+    try {
+      setBusy(true)
+      setError(null)
+      setInfo(null)
+      await api.forgotPassword(email.trim())
+      setInfo(
+        'Si el email está registrado, recibirás instrucciones para restablecer la contraseña.',
+      )
+    } catch (err) {
+      setError(String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleResetSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!passwordResetToken) return
+    if (password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres.')
+      return
+    }
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden.')
+      return
+    }
+    try {
+      setBusy(true)
+      setError(null)
+      setInfo(null)
+      await api.resetPassword(passwordResetToken, password)
+      onClearPasswordResetToken()
+      setPassword('')
+      setConfirmPassword('')
+      setMode('login')
+      setInfo('Contraseña actualizada. Ingresá con tu email y la nueva contraseña.')
+    } catch (err) {
+      setError(String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const showAuthToggle = mode !== 'forgot' && mode !== 'reset'
 
   return (
     <div className="relative min-h-screen bg-bg">
@@ -734,56 +802,103 @@ function LoginScreen({
             </div>
           </div>
           <Card>
-            {/* Toggle */}
-            <div className="mb-4 flex rounded-xl border border-border bg-surface-alt p-1">
-              <button type="button" onClick={() => { setMode('login'); setError(null) }}
-                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition cursor-pointer ${mode === 'login' ? 'bg-surface text-strong shadow-sm' : 'text-muted hover:text-strong'}`}>
-                Ingresar
-              </button>
-              <button type="button" onClick={() => { setMode('register'); setError(null) }}
-                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition cursor-pointer ${mode === 'register' ? 'bg-surface text-strong shadow-sm' : 'text-muted hover:text-strong'}`}>
-                Registrarse
-              </button>
-            </div>
-
-            <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-              <Field label="Email">
-                <Input value={email} onChange={setEmail} placeholder="tu@email.com" type="email" />
-              </Field>
-              {mode === 'register' && (
-                <Field label="Nombre">
-                  <Input value={name} onChange={setName} placeholder="Tu nombre" />
-                </Field>
-              )}
-              <Field label="Contraseña">
-                <Input value={password} onChange={setPassword} placeholder="••••••••" type="password" />
-              </Field>
-              <Btn type="submit" disabled={busy} className="mt-1 w-full py-3 text-base font-bold">
-                {busy ? '...' : mode === 'login' ? 'Ingresar' : 'Crear cuenta'}
-              </Btn>
-              {process.env.NODE_ENV === 'development' && (
-                <button type="button"
-                  onClick={async () => {
-                    setBusy(true)
-                    setError(null)
-                    try {
-                      await onLogin('demo@midori.app', 'demo1234')
-                    } catch {
-                      try {
-                        await onRegister('demo@midori.app', 'Demo User', 'demo1234')
-                      } catch (err) {
-                        setError(String(err))
-                      }
-                    } finally {
-                      setBusy(false)
-                    }
-                  }}
-                  className="text-xs text-dim hover:text-muted transition cursor-pointer text-center w-full">
-                  Usar credenciales de test
+            {showAuthToggle && (
+              <div className="mb-4 flex rounded-xl border border-border bg-surface-alt p-1">
+                <button type="button" onClick={() => { setMode('login'); setError(null); setInfo(null) }}
+                  className={`flex-1 rounded-lg py-2 text-sm font-semibold transition cursor-pointer ${mode === 'login' ? 'bg-surface text-strong shadow-sm' : 'text-muted hover:text-strong'}`}>
+                  Ingresar
                 </button>
-              )}
-              {error && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
-            </form>
+                <button type="button" onClick={() => { setMode('register'); setError(null); setInfo(null) }}
+                  className={`flex-1 rounded-lg py-2 text-sm font-semibold transition cursor-pointer ${mode === 'register' ? 'bg-surface text-strong shadow-sm' : 'text-muted hover:text-strong'}`}>
+                  Registrarse
+                </button>
+              </div>
+            )}
+
+            {mode === 'reset' && passwordResetToken ? (
+              <form className="flex flex-col gap-4" onSubmit={handleResetSubmit}>
+                <p className="text-sm text-muted">Elegí una nueva contraseña para tu cuenta.</p>
+                <Field label="Nueva contraseña">
+                  <Input value={password} onChange={setPassword} placeholder="••••••••" type="password" />
+                </Field>
+                <Field label="Repetir contraseña">
+                  <Input value={confirmPassword} onChange={setConfirmPassword} placeholder="••••••••" type="password" />
+                </Field>
+                <Btn type="submit" disabled={busy} className="mt-1 w-full py-3 text-base font-bold">
+                  {busy ? '...' : 'Guardar contraseña'}
+                </Btn>
+                <button type="button"
+                  className="text-xs text-dim hover:text-muted transition cursor-pointer text-center"
+                  onClick={() => { onClearPasswordResetToken(); setMode('login'); setError(null); setInfo(null); setPassword(''); setConfirmPassword('') }}>
+                  Volver a ingresar
+                </button>
+                {error && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
+                {info && <p className="rounded-lg bg-primary/10 px-3 py-2 text-sm text-primary">{info}</p>}
+              </form>
+            ) : mode === 'forgot' ? (
+              <form className="flex flex-col gap-4" onSubmit={handleForgotSubmit}>
+                <p className="text-sm text-muted">Te enviamos un enlace a tu correo para restablecer la contraseña.</p>
+                <Field label="Email">
+                  <Input value={email} onChange={setEmail} placeholder="tu@email.com" type="email" />
+                </Field>
+                <Btn type="submit" disabled={busy} className="mt-1 w-full py-3 text-base font-bold">
+                  {busy ? '...' : 'Enviar instrucciones'}
+                </Btn>
+                <button type="button"
+                  className="text-xs text-dim hover:text-muted transition cursor-pointer text-center"
+                  onClick={() => { setMode('login'); setError(null); setInfo(null) }}>
+                  Volver a ingresar
+                </button>
+                {error && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
+                {info && <p className="rounded-lg bg-primary/10 px-3 py-2 text-sm text-primary">{info}</p>}
+              </form>
+            ) : (
+              <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+                <Field label="Email">
+                  <Input value={email} onChange={setEmail} placeholder="tu@email.com" type="email" />
+                </Field>
+                {mode === 'register' && (
+                  <Field label="Nombre">
+                    <Input value={name} onChange={setName} placeholder="Tu nombre" />
+                  </Field>
+                )}
+                <Field label="Contraseña">
+                  <Input value={password} onChange={setPassword} placeholder="••••••••" type="password" />
+                </Field>
+                {mode === 'login' && (
+                  <button type="button"
+                    className="-mt-1 text-left text-xs text-primary hover:underline cursor-pointer"
+                    onClick={() => { setMode('forgot'); setError(null); setInfo(null) }}>
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                )}
+                <Btn type="submit" disabled={busy} className="mt-1 w-full py-3 text-base font-bold">
+                  {busy ? '...' : mode === 'login' ? 'Ingresar' : 'Crear cuenta'}
+                </Btn>
+                {process.env.NODE_ENV === 'development' && (
+                  <button type="button"
+                    onClick={async () => {
+                      setBusy(true)
+                      setError(null)
+                      try {
+                        await onLogin('demo@midori.app', 'demo1234')
+                      } catch {
+                        try {
+                          await onRegister('demo@midori.app', 'Demo User', 'demo1234')
+                        } catch (err) {
+                          setError(String(err))
+                        }
+                      } finally {
+                        setBusy(false)
+                      }
+                    }}
+                    className="text-xs text-dim hover:text-muted transition cursor-pointer text-center w-full">
+                    Usar credenciales de test
+                  </button>
+                )}
+                {error && <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
+              </form>
+            )}
           </Card>
         </div>
       </main>
@@ -826,6 +941,22 @@ export default function App() {
     photos: PlantPhoto[]
   } | null>(null)
   const [loadingPlant, setLoadingPlant] = useState(false)
+  const [passwordResetToken, setPasswordResetToken] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const t = params.get('token')
+    if (t) setPasswordResetToken(t)
+  }, [])
+
+  const clearPasswordResetToken = () => {
+    setPasswordResetToken(null)
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname
+      window.history.replaceState({}, '', path)
+    }
+  }
 
   useEffect(() => {
     const token = localStorage.getItem('midori_token')
@@ -1116,7 +1247,15 @@ export default function App() {
   ], [dashboard?.plants.length, todayPendingTasks.length, overdueTasks.length, dashboard?.criticalAlerts.length])
 
   if (!authToken) {
-    return <LoginScreen onLogin={handleLogin} onRegister={handleRegister} gardenBackground={gardenBackground} />
+    return (
+      <LoginScreen
+        onLogin={handleLogin}
+        onRegister={handleRegister}
+        gardenBackground={gardenBackground}
+        passwordResetToken={passwordResetToken}
+        onClearPasswordResetToken={clearPasswordResetToken}
+      />
+    )
   }
 
   const tabs: { key: Tab; label: string }[] = [

@@ -88,3 +88,15 @@ CREATE INDEX IF NOT EXISTS idx_plants_user_id ON plants(user_id);
 CREATE INDEX IF NOT EXISTS idx_care_tasks_plant_id ON care_tasks(plant_id);
 CREATE INDEX IF NOT EXISTS idx_care_tasks_scheduled_for ON care_tasks(scheduled_for);
 CREATE INDEX IF NOT EXISTS idx_notifications_status ON notifications(status);
+
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_reset_token_hash ON password_reset_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_password_reset_user_id ON password_reset_tokens(user_id);

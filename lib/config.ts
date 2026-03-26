@@ -18,4 +18,7 @@ export const config = {
   /** Dominio público de lectura (r2.dev / custom). No usar *.r2.cloudflarestorage.com aquí. */
   r2PublicUrl: process.env.R2_PUBLIC_URL ?? '',
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3333',
+  resendApiKey: process.env.RESEND_API_KEY ?? '',
+  /** Remitente verificado en Resend (ej. onboarding@resend.dev o notificaciones@tudominio.com) */
+  emailFrom: process.env.EMAIL_FROM ?? '',
 }

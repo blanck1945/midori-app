@@ -44,7 +44,14 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
 
   if (!res.ok) {
     const payload = await res.text()
-    throw new Error(payload || `HTTP ${res.status}`)
+    let msg = payload || `HTTP ${res.status}`
+    try {
+      const j = JSON.parse(payload) as { message?: string }
+      if (typeof j.message === 'string') msg = j.message
+    } catch {
+      /* texto plano */
+    }
+    throw new Error(msg)
   }
 
   return (await res.json()) as T
@@ -61,6 +68,18 @@ export const api = {
     return request<LoginResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email, name, password }),
+    })
+  },
+  forgotPassword(email: string) {
+    return request<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    })
+  },
+  resetPassword(token: string, password: string) {
+    return request<{ ok: true }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
     })
   },
   getDashboard(token: string) {
