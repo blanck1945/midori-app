@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build / cache
+dist/
+.next/
+*.tsbuildinfo
+
+# Env (secrets)
+.env
+.env.local
+.env.*.local
+
+# SQLite / datos locales
+data/*.sqlite
+data/*.sqlite-*
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Logs
+*.log
+npm-debug.log*

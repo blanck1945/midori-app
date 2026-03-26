@@ -1,0 +1,42 @@
+{
+  "name": "midori",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node ../../node_modules/vinext/dist/cli.js dev --port 3333",
+    "build": "node ../../node_modules/vinext/dist/cli.js build",
+    "start": "node ../../node_modules/vinext/dist/cli.js start",
+    "lint": "node ../../node_modules/vinext/dist/cli.js lint"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1003.0",
+    "@smithy/node-http-handler": "^4.0.0",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^11.10.0",
+    "dotenv": "^17.3.1",
+    "jsonwebtoken": "^9.0.3",
+    "node-cron": "^4.2.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "uuid": "^13.0.0",
+    "vinext": "^0.0.35",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.1",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "@vitejs/plugin-rsc": "^0.5.19",
+    "next": "^16.2.1",
+    "react-server-dom-webpack": "^19.2.4",
+    "tailwindcss": "^4.2.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
+  }
+}
