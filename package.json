@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node ../../node_modules/vinext/dist/cli.js dev --port 3333",
-    "build": "node ../../node_modules/vinext/dist/cli.js build",
-    "start": "node ../../node_modules/vinext/dist/cli.js start",
-    "lint": "node ../../node_modules/vinext/dist/cli.js lint"
+    "dev": "npx vinext dev --port 3333",
+    "build": "npx vinext build",
+    "start": "npx vinext start",
+    "lint": "npx vinext lint"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1003.0",
