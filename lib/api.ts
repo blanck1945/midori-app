@@ -82,6 +82,20 @@ export const api = {
       body: JSON.stringify({ token, password }),
     })
   },
+  updateProfile(
+    token: string,
+    body: {
+      name?: string
+      email?: string
+      currentPassword?: string
+      newPassword?: string
+    },
+  ) {
+    return request<LoginResponse>('/auth/me', {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }, token)
+  },
   getDashboard(token: string) {
     return request<DashboardData>('/dashboard', {}, token)
   },

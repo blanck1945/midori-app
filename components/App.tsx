@@ -957,23 +957,25 @@ export default function App() {
   } | null>(null)
   const [loadingPlant, setLoadingPlant] = useState(false)
   const [passwordResetToken, setPasswordResetToken] = useState<string | null>(null)
+  /** Evita mostrar LoginScreen antes de leer `localStorage` (flash falso tras recarga/deploy). */
+  const [authReady, setAuthReady] = useState(false)
+
+  const [profileName, setProfileName] = useState('')
+  const [profileEmail, setProfileEmail] = useState('')
+  const [profileCurrentPassword, setProfileCurrentPassword] = useState('')
+  const [pwdCurrent, setPwdCurrent] = useState('')
+  const [pwdNew, setPwdNew] = useState('')
+  const [pwdConfirm, setPwdConfirm] = useState('')
+  const [accountBusy, setAccountBusy] = useState(false)
+  const [accountMessage, setAccountMessage] = useState<string | null>(null)
+  const [accountError, setAccountError] = useState<string | null>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const t = params.get('token')
     if (t) setPasswordResetToken(t)
-  }, [])
 
-  const clearPasswordResetToken = () => {
-    setPasswordResetToken(null)
-    if (typeof window !== 'undefined') {
-      const path = window.location.pathname
-      window.history.replaceState({}, '', path)
-    }
-  }
-
-  useEffect(() => {
     const token = localStorage.getItem('midori_token')
     if (token) setAuthToken(token)
     try {
@@ -984,7 +986,23 @@ export default function App() {
     }
     const lang = localStorage.getItem('midori_lang')
     if (lang === 'es' || lang === 'en' || lang === 'pt') setLanguage(lang)
+    setAuthReady(true)
   }, [])
+
+  useEffect(() => {
+    if (!user) return
+    setProfileName(user.name)
+    setProfileEmail(user.email)
+    setProfileCurrentPassword('')
+  }, [user])
+
+  const clearPasswordResetToken = () => {
+    setPasswordResetToken(null)
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname
+      window.history.replaceState({}, '', path)
+    }
+  }
 
   // Garden background derived from plants' colorRgb — no extra requests
   const gardenBackground = useMemo(() => {
@@ -1025,6 +1043,90 @@ export default function App() {
     localStorage.setItem('midori_user', JSON.stringify(result.user))
     setAuthToken(result.token)
     setUser(result.user)
+  }
+
+  const handleSaveProfile = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!authToken || !user) return
+    const nameTrim = profileName.trim()
+    const emailTrim = profileEmail.trim()
+    const nameChanged = nameTrim !== user.name
+    const emailChanged = emailTrim.toLowerCase() !== user.email.toLowerCase()
+    if (!nameChanged && !emailChanged) {
+      setAccountError('No hay cambios en el perfil.')
+      setAccountMessage(null)
+      return
+    }
+    if (emailChanged && !profileCurrentPassword.trim()) {
+      setAccountError('Ingresá tu contraseña actual para cambiar el email.')
+      setAccountMessage(null)
+      return
+    }
+    try {
+      setAccountBusy(true)
+      setAccountError(null)
+      setAccountMessage(null)
+      const body: { name?: string; email?: string; currentPassword?: string } = {}
+      if (nameChanged) body.name = nameTrim
+      if (emailChanged) {
+        body.email = emailTrim
+        body.currentPassword = profileCurrentPassword
+      }
+      const result = await api.updateProfile(authToken, body)
+      localStorage.setItem('midori_token', result.token)
+      localStorage.setItem('midori_user', JSON.stringify(result.user))
+      setAuthToken(result.token)
+      setUser(result.user)
+      setProfileCurrentPassword('')
+      setAccountMessage('Perfil actualizado.')
+    } catch (err) {
+      setAccountError(String(err))
+      setAccountMessage(null)
+    } finally {
+      setAccountBusy(false)
+    }
+  }
+
+  const handleChangePassword = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!authToken) return
+    if (!pwdCurrent.trim()) {
+      setAccountError('Ingresá tu contraseña actual.')
+      setAccountMessage(null)
+      return
+    }
+    if (pwdNew.length < 6) {
+      setAccountError('La nueva contraseña debe tener al menos 6 caracteres.')
+      setAccountMessage(null)
+      return
+    }
+    if (pwdNew !== pwdConfirm) {
+      setAccountError('Las contraseñas nuevas no coinciden.')
+      setAccountMessage(null)
+      return
+    }
+    try {
+      setAccountBusy(true)
+      setAccountError(null)
+      setAccountMessage(null)
+      const result = await api.updateProfile(authToken, {
+        currentPassword: pwdCurrent,
+        newPassword: pwdNew,
+      })
+      localStorage.setItem('midori_token', result.token)
+      localStorage.setItem('midori_user', JSON.stringify(result.user))
+      setAuthToken(result.token)
+      setUser(result.user)
+      setPwdCurrent('')
+      setPwdNew('')
+      setPwdConfirm('')
+      setAccountMessage('Contraseña actualizada.')
+    } catch (err) {
+      setAccountError(String(err))
+      setAccountMessage(null)
+    } finally {
+      setAccountBusy(false)
+    }
   }
 
   const appendPhotoFiles = (files: FileList | null) => {
@@ -1260,6 +1362,18 @@ export default function App() {
     { label: 'Tareas hoy', value: todayPendingTasks.length },
     { label: overdueTasks.length > 0 ? 'Vencidas' : 'Alertas', value: overdueTasks.length > 0 ? overdueTasks.length : dashboard?.criticalAlerts.length ?? 0, overdue: overdueTasks.length > 0 },
   ], [dashboard?.plants.length, todayPendingTasks.length, overdueTasks.length, dashboard?.criticalAlerts.length])
+
+  if (!authReady) {
+    return (
+      <div className="relative min-h-screen bg-bg flex flex-col items-center justify-center gap-3">
+        <div
+          className="h-9 w-9 animate-spin rounded-full border-2 border-border border-t-primary"
+          aria-hidden
+        />
+        <p className="text-sm text-muted">Cargando…</p>
+      </div>
+    )
+  }
 
   if (!authToken) {
     return (
@@ -1639,11 +1753,58 @@ export default function App() {
                       ))}
                     </div>
                   </div>
-                  <div className="border-t border-border pt-4 flex flex-col gap-2">
+                  <div className="border-t border-border pt-4 flex flex-col gap-4">
                     <Label>Cuenta</Label>
-                    <p className="text-sm text-muted">{user?.email}</p>
-                    <Btn variant="secondary" size="sm" className="w-fit mt-1"
-                      onClick={() => { localStorage.removeItem('midori_token'); localStorage.removeItem('midori_user'); setAuthToken(null); setUser(null); setDashboard(null) }}>
+                    <form className="flex flex-col gap-3" onSubmit={handleSaveProfile}>
+                      <Field label="Nombre">
+                        <Input value={profileName} onChange={setProfileName} placeholder="Tu nombre" />
+                      </Field>
+                      <Field label="Email">
+                        <Input value={profileEmail} onChange={setProfileEmail} placeholder="tu@email.com" type="email" />
+                      </Field>
+                      {user && profileEmail.trim().toLowerCase() !== user.email.toLowerCase() && (
+                        <Field label="Contraseña actual">
+                          <Input value={profileCurrentPassword} onChange={setProfileCurrentPassword} placeholder="••••••••" type="password" />
+                        </Field>
+                      )}
+                      <Btn type="submit" variant="secondary" size="sm" className="w-fit" disabled={accountBusy}>
+                        {accountBusy ? '...' : 'Guardar perfil'}
+                      </Btn>
+                    </form>
+
+                    <form className="flex flex-col gap-3 border-t border-border pt-4" onSubmit={handleChangePassword}>
+                      <p className="text-xs text-muted -mb-1">Cambiar contraseña</p>
+                      <Field label="Contraseña actual">
+                        <Input value={pwdCurrent} onChange={setPwdCurrent} placeholder="••••••••" type="password" />
+                      </Field>
+                      <Field label="Nueva contraseña">
+                        <Input value={pwdNew} onChange={setPwdNew} placeholder="••••••••" type="password" />
+                      </Field>
+                      <Field label="Repetir nueva contraseña">
+                        <Input value={pwdConfirm} onChange={setPwdConfirm} placeholder="••••••••" type="password" />
+                      </Field>
+                      <Btn type="submit" variant="secondary" size="sm" className="w-fit" disabled={accountBusy}>
+                        {accountBusy ? '...' : 'Actualizar contraseña'}
+                      </Btn>
+                    </form>
+
+                    {accountMessage && (
+                      <p className="rounded-lg bg-primary/10 px-3 py-2 text-sm text-primary">{accountMessage}</p>
+                    )}
+                    {accountError && (
+                      <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{accountError}</p>
+                    )}
+
+                    <Btn variant="secondary" size="sm" className="w-fit"
+                      onClick={() => {
+                        localStorage.removeItem('midori_token')
+                        localStorage.removeItem('midori_user')
+                        setAuthToken(null)
+                        setUser(null)
+                        setDashboard(null)
+                        setAccountMessage(null)
+                        setAccountError(null)
+                      }}>
                       Cerrar sesión
                     </Btn>
                   </div>
