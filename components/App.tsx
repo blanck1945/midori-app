@@ -715,6 +715,16 @@ function LoginScreen({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    if (mode === 'register') {
+      if (password.length < 6) {
+        setError('La contraseña debe tener al menos 6 caracteres.')
+        return
+      }
+      if (password !== confirmPassword) {
+        setError('Las contraseñas no coinciden.')
+        return
+      }
+    }
     try {
       setBusy(true)
       setError(null)
@@ -804,11 +814,11 @@ function LoginScreen({
           <Card>
             {showAuthToggle && (
               <div className="mb-4 flex rounded-xl border border-border bg-surface-alt p-1">
-                <button type="button" onClick={() => { setMode('login'); setError(null); setInfo(null) }}
+                <button type="button" onClick={() => { setMode('login'); setError(null); setInfo(null); setConfirmPassword('') }}
                   className={`flex-1 rounded-lg py-2 text-sm font-semibold transition cursor-pointer ${mode === 'login' ? 'bg-surface text-strong shadow-sm' : 'text-muted hover:text-strong'}`}>
                   Ingresar
                 </button>
-                <button type="button" onClick={() => { setMode('register'); setError(null); setInfo(null) }}
+                <button type="button" onClick={() => { setMode('register'); setError(null); setInfo(null); setConfirmPassword('') }}
                   className={`flex-1 rounded-lg py-2 text-sm font-semibold transition cursor-pointer ${mode === 'register' ? 'bg-surface text-strong shadow-sm' : 'text-muted hover:text-strong'}`}>
                   Registrarse
                 </button>
@@ -865,6 +875,11 @@ function LoginScreen({
                 <Field label="Contraseña">
                   <Input value={password} onChange={setPassword} placeholder="••••••••" type="password" />
                 </Field>
+                {mode === 'register' && (
+                  <Field label="Repetir contraseña">
+                    <Input value={confirmPassword} onChange={setConfirmPassword} placeholder="••••••••" type="password" />
+                  </Field>
+                )}
                 {mode === 'login' && (
                   <button type="button"
                     className="-mt-1 text-left text-xs text-primary hover:underline cursor-pointer"
