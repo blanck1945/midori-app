@@ -1,4 +1,5 @@
--- SQLite (dev: archivo local; prod Cloudflare: D1 usa el mismo dialecto)
+-- SQLite / libSQL (Turso). Mismo dialecto que D1 en Cloudflare.
+-- Migración manual en Turso: `turso db shell <nombre> --file lib/sql/schema.sql` (o cat | turso db shell).
 
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,

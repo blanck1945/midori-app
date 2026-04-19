@@ -5,8 +5,14 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') })
 
 export const config = {
   port: Number(process.env.PORT ?? 3333),
-  /** Ruta al archivo SQLite (prod: volumen persistente o D1 export) */
+  /** URL libSQL (`libsql://`, `https://*.turso.io`, …). Vacío → archivo local vía `databasePath`. */
+  tursoDatabaseUrl: process.env.TURSO_DATABASE_URL ?? process.env.DATABASE_URL ?? '',
+  /** Token Turso / libSQL Cloud (solo URL remota). */
+  tursoAuthToken: process.env.TURSO_AUTH_TOKEN ?? '',
+  /** Ruta al archivo SQLite cuando no hay `tursoDatabaseUrl` */
   databasePath: process.env.DATABASE_PATH ?? path.resolve(process.cwd(), 'data', 'midori.sqlite'),
+  /** Ejecutar `lib/sql/schema.sql` al iniciar (`executeMultiple`). Desactivar en prod si migrás con CLI. */
+  applySchemaOnStartup: process.env.APPLY_SCHEMA_ON_STARTUP !== 'false',
   jwtSecret: process.env.JWT_SECRET ?? 'dev-secret',
   appEnv: process.env.APP_ENV ?? 'development',
   geminiApiKey: process.env.GEMINI_API_KEY ?? '',

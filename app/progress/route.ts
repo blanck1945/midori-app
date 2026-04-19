@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     GROUP BY p.id
     ORDER BY p.created_at DESC
   `
-  const rows = queryAll<{
+  const rows = await queryAll<{
     plant_id: string
     tasks_total_last_7_days: number | null
     tasks_done_last_7_days: number | null

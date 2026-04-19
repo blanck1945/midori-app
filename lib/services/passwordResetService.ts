@@ -10,22 +10,22 @@ export function generateRawResetToken(): string {
   return randomBytes(32).toString('base64url')
 }
 
-export function createPasswordResetToken(userId: string, rawToken: string): void {
+export async function createPasswordResetToken(userId: string, rawToken: string): Promise<void> {
   const tokenHash = hashResetToken(rawToken)
-  run('DELETE FROM password_reset_tokens WHERE user_id = ? AND used_at IS NULL', [userId])
+  await run('DELETE FROM password_reset_tokens WHERE user_id = ? AND used_at IS NULL', [userId])
   const id = randomUUID()
-  run(
+  await run(
     `INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at)
      VALUES (?, ?, ?, datetime('now', '+1 hour'))`,
     [id, userId, tokenHash],
   )
 }
 
-export function consumePasswordResetToken(
+export async function consumePasswordResetToken(
   rawToken: string,
-): { userId: string; tokenRowId: string } | null {
+): Promise<{ userId: string; tokenRowId: string } | null> {
   const tokenHash = hashResetToken(rawToken)
-  const row = queryOne<{
+  const row = await queryOne<{
     id: string
     user_id: string
     expires_at: string
@@ -40,6 +40,6 @@ export function consumePasswordResetToken(
   return { userId: row.user_id, tokenRowId: row.id }
 }
 
-export function markPasswordResetTokenUsed(tokenRowId: string): void {
-  run(`UPDATE password_reset_tokens SET used_at = datetime('now') WHERE id = ?`, [tokenRowId])
+export async function markPasswordResetTokenUsed(tokenRowId: string): Promise<void> {
+  await run(`UPDATE password_reset_tokens SET used_at = datetime('now') WHERE id = ?`, [tokenRowId])
 }

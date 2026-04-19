@@ -12,7 +12,7 @@ const loginSchema = z.object({
 export async function POST(request: Request) {
   try {
     const body = loginSchema.parse(await request.json())
-    const row = queryOne<{
+    const row = await queryOne<{
       id: string
       email: string
       name: string

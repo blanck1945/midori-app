@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '../../../../lib/auth'
-import { getDb } from '../../../../lib/db'
+import { getDb, queryOne, rowsFromResultSet } from '../../../../lib/db'
 import { mapDiagnosis, mapTask } from '../../../../lib/mappers'
 import { buildCareTasksFromDiagnosis } from '../../../../lib/services/carePlanService'
 import { generateDiagnosis } from '../../../../lib/services/diagnosisService'
@@ -28,23 +28,19 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     const payload = diagnoseSchema.parse(await request.json())
     const { plantId } = await ctx.params
 
-    const plantRow = getDb()
-      .prepare('SELECT * FROM plants WHERE id = ? AND user_id = ?')
-      .get(plantId, user.id) as
-      | {
-          id: string
-          name: string
-          species_guess: string
-          location: string
-          light_level: string
-        }
-      | undefined
+    const plantRow = await queryOne<{
+      id: string
+      name: string
+      species_guess: string
+      location: string
+      light_level: string
+    }>('SELECT * FROM plants WHERE id = ? AND user_id = ?', [plantId, user.id])
 
     if (!plantRow) {
       return NextResponse.json({ message: 'Planta no encontrada' }, { status: 404 })
     }
 
-    if (getPlantPhotoCount(plantId) >= MAX_PLANT_PHOTOS) {
+    if ((await getPlantPhotoCount(plantId)) >= MAX_PLANT_PHOTOS) {
       return NextResponse.json(
         { message: `Máximo ${MAX_PLANT_PHOTOS} fotos por planta` },
         { status: 409 },
@@ -86,59 +82,67 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       payload.language,
     )
 
-    const db = getDb()
-    const txResult = db.transaction(() => {
+    const db = await getDb()
+    const tx = await db.transaction('write')
+    let txResult!: {
+      diagnosis: Parameters<typeof mapDiagnosis>[0]
+      generatedTasks: Parameters<typeof mapTask>[0][]
+    }
+    try {
       const photoId = randomUUID()
-      db.prepare(
-        `INSERT INTO plant_photos (id, plant_id, image_url, note, context)
+      await tx.execute({
+        sql: `INSERT INTO plant_photos (id, plant_id, image_url, note, context)
          VALUES (?, ?, ?, ?, ?)`,
-      ).run(photoId, plantRow.id, storedImageUrl, payload.note ?? null, payload.context)
+        args: [photoId, plantRow.id, storedImageUrl, payload.note ?? null, payload.context],
+      })
 
       const diagnosisId = randomUUID()
-      db.prepare(
-        `INSERT INTO diagnoses
+      await tx.execute({
+        sql: `INSERT INTO diagnoses
          (id, plant_id, photo_id, severity, confidence, summary, detected_issues, recommendations, raw_json)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).run(
-        diagnosisId,
-        plantRow.id,
-        photoId,
-        diagnosisData.severity,
-        diagnosisData.confidence,
-        diagnosisData.summary,
-        JSON.stringify(diagnosisData.detectedIssues),
-        JSON.stringify(diagnosisData.recommendations),
-        JSON.stringify(diagnosisData),
-      )
+        args: [
+          diagnosisId,
+          plantRow.id,
+          photoId,
+          diagnosisData.severity,
+          diagnosisData.confidence,
+          diagnosisData.summary,
+          JSON.stringify(diagnosisData.detectedIssues),
+          JSON.stringify(diagnosisData.recommendations),
+          JSON.stringify(diagnosisData),
+        ],
+      })
 
-      db.prepare(
-        `UPDATE care_plans
+      await tx.execute({
+        sql: `UPDATE care_plans
          SET status = 'archived', ended_at = datetime('now')
          WHERE plant_id = ? AND status = 'active'`,
-      ).run(plantRow.id)
+        args: [plantRow.id],
+      })
 
-      const versionRow = db
-        .prepare('SELECT COALESCE(MAX(version), 0) + 1 AS next_version FROM care_plans WHERE plant_id = ?')
-        .get(plantRow.id) as { next_version: number }
-      const nextVersion = Number(versionRow.next_version)
+      const versionRs = await tx.execute({
+        sql: 'SELECT COALESCE(MAX(version), 0) + 1 AS next_version FROM care_plans WHERE plant_id = ?',
+        args: [plantRow.id],
+      })
+      const nextVersion = Number(rowsFromResultSet<{ next_version: number }>(versionRs)[0]?.next_version ?? 0)
 
       const carePlanId = randomUUID()
-      db.prepare(
-        `INSERT INTO care_plans (id, plant_id, diagnosis_id, version, status)
+      await tx.execute({
+        sql: `INSERT INTO care_plans (id, plant_id, diagnosis_id, version, status)
          VALUES (?, ?, ?, ?, 'active')`,
-      ).run(carePlanId, plantRow.id, diagnosisId, nextVersion)
+        args: [carePlanId, plantRow.id, diagnosisId, nextVersion],
+      })
 
       const generatedRows: Parameters<typeof mapTask>[0][] = []
       for (const task of taskDrafts) {
         const taskId = randomUUID()
-        const ins = db
-          .prepare(
-            `INSERT INTO care_tasks
+        const insRs = await tx.execute({
+          sql: `INSERT INTO care_tasks
              (id, plant_id, care_plan_id, title, details, scheduled_for, status, priority, category)
              VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
              RETURNING *`,
-          )
-          .get(
+          args: [
             taskId,
             plantRow.id,
             carePlanId,
@@ -147,24 +151,37 @@ export async function POST(request: NextRequest, ctx: Ctx) {
             task.scheduledFor,
             task.priority,
             task.category,
-          ) as Parameters<typeof mapTask>[0]
+          ],
+        })
+        const ins = rowsFromResultSet<Parameters<typeof mapTask>[0]>(insRs)[0]!
         generatedRows.push(ins)
-        db.prepare('INSERT INTO task_logs (id, task_id, status, note) VALUES (?, ?, ?, ?)').run(
-          randomUUID(),
-          taskId,
-          'pending',
-          'Task creada automáticamente por plan',
-        )
+        await tx.execute({
+          sql: 'INSERT INTO task_logs (id, task_id, status, note) VALUES (?, ?, ?, ?)',
+          args: [
+            randomUUID(),
+            taskId,
+            'pending',
+            'Task creada automáticamente por plan',
+          ],
+        })
       }
 
-      const diagRow = db.prepare('SELECT * FROM diagnoses WHERE id = ?').get(diagnosisId) as Parameters<
-        typeof mapDiagnosis
-      >[0]
+      const diagRs = await tx.execute({
+        sql: 'SELECT * FROM diagnoses WHERE id = ?',
+        args: [diagnosisId],
+      })
+      const diagRow = rowsFromResultSet<Parameters<typeof mapDiagnosis>[0]>(diagRs)[0]!
 
-      return { diagnosis: diagRow, generatedTasks: generatedRows }
-    })()
+      txResult = { diagnosis: diagRow, generatedTasks: generatedRows }
 
-    queueNotificationsForUpcomingTasks()
+      await tx.commit()
+    } finally {
+      tx.close()
+    }
+
+    void queueNotificationsForUpcomingTasks().catch((err) =>
+      console.error('queueNotificationsForUpcomingTasks:', (err as Error).message),
+    )
 
     return NextResponse.json(
       {

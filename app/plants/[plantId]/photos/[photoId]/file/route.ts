@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
 
   const { plantId, photoId } = await ctx.params
 
-  const plantRow = queryOne<{ id: string }>('SELECT id FROM plants WHERE id = ? AND user_id = ?', [
+  const plantRow = await queryOne<{ id: string }>('SELECT id FROM plants WHERE id = ? AND user_id = ?', [
     plantId,
     user.id,
   ])
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     return NextResponse.json({ message: 'Planta no encontrada' }, { status: 404 })
   }
 
-  const photoRow = queryOne<{ image_url: string }>(
+  const photoRow = await queryOne<{ image_url: string }>(
     'SELECT image_url FROM plant_photos WHERE id = ? AND plant_id = ?',
     [photoId, plantId],
   )

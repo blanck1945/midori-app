@@ -12,7 +12,7 @@ const resetSchema = z.object({
 export async function POST(request: Request) {
   try {
     const body = resetSchema.parse(await request.json())
-    const consumed = consumePasswordResetToken(body.token)
+    const consumed = await consumePasswordResetToken(body.token)
 
     if (!consumed) {
       return NextResponse.json(
@@ -22,8 +22,8 @@ export async function POST(request: Request) {
     }
 
     const passwordHash = await bcrypt.hash(body.password, 10)
-    run('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, consumed.userId])
-    markPasswordResetTokenUsed(consumed.tokenRowId)
+    await run('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, consumed.userId])
+    await markPasswordResetTokenUsed(consumed.tokenRowId)
 
     return NextResponse.json({ ok: true as const })
   } catch (error) {

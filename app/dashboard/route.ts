@@ -7,12 +7,12 @@ export async function GET(request: NextRequest) {
   const user = requireUser(request)
   if (!user) return NextResponse.json({ message: 'Token faltante' }, { status: 401 })
 
-  const plantsResult = queryAll<Parameters<typeof mapPlant>[0]>(
+  const plantsResult = await queryAll<Parameters<typeof mapPlant>[0]>(
     'SELECT * FROM plants WHERE user_id = ? ORDER BY created_at DESC',
     [user.id],
   )
 
-  const dueTasksResult = queryAll<Parameters<typeof mapTask>[0]>(
+  const dueTasksResult = await queryAll<Parameters<typeof mapTask>[0]>(
     `SELECT t.* FROM care_tasks t
      JOIN plants p ON p.id = t.plant_id
      WHERE p.user_id = ?
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     [user.id],
   )
 
-  const criticalResult = queryAll<{ plant_name: string; summary: string }>(
+  const criticalResult = await queryAll<{ plant_name: string; summary: string }>(
     `SELECT p.name AS plant_name, d.summary
      FROM diagnoses d
      JOIN plants p ON p.id = d.plant_id

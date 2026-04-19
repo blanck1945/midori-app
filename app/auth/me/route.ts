@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser, signToken } from '../../../lib/auth'
+import type { InArgs } from '@libsql/client'
 import { queryOne, run } from '../../../lib/db'
 
 const patchSchema = z.object({
@@ -26,7 +27,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ message: 'Nada que actualizar' }, { status: 400 })
     }
 
-    const row = queryOne<{
+    const row = await queryOne<{
       id: string
       email: string
       name: string
@@ -62,7 +63,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (emailChanged) {
-      const taken = queryOne<{ id: string }>(
+      const taken = await queryOne<{ id: string }>(
         'SELECT id FROM users WHERE lower(email) = lower(?) AND id != ?',
         [emailVal, row.id],
       )
@@ -88,14 +89,14 @@ export async function PATCH(request: NextRequest) {
     }
 
     params.push(row.id)
-    run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params)
+    await run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params as InArgs)
 
-    const updated = queryOne<{ id: string; email: string; name: string }>(
+    const updated = await queryOne<{ id: string; email: string; name: string }>(
       'SELECT id, email, name FROM users WHERE id = ?',
       [row.id],
     )!
 
-    const token = signToken(updated)
+    const token = signToken(updated!)
     return NextResponse.json({ token, user: updated })
   } catch (error) {
     return NextResponse.json({ message: (error as Error).message }, { status: 400 })

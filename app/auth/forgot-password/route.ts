@@ -18,14 +18,14 @@ export async function POST(request: Request) {
   try {
     const body = forgotSchema.parse(await request.json())
     const emailNorm = body.email.trim()
-    const user = queryOne<{ id: string; email: string; password_hash: string | null }>(
+    const user = await queryOne<{ id: string; email: string; password_hash: string | null }>(
       'SELECT id, email, password_hash FROM users WHERE lower(email) = lower(?)',
       [emailNorm],
     )
 
     if (user?.password_hash) {
       const rawToken = generateRawResetToken()
-      createPasswordResetToken(user.id, rawToken)
+      await createPasswordResetToken(user.id, rawToken)
       const base = config.frontendUrl.replace(/\/$/, '')
       const resetUrl = `${base}/reset-password?token=${encodeURIComponent(rawToken)}`
 

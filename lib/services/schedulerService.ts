@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { queryAll, run } from '../db'
 
-export function queueNotificationsForUpcomingTasks(): Array<{ id: string; task_id: string }> {
-  const candidates = queryAll<{ id: string; scheduled_for: string }>(
+export async function queueNotificationsForUpcomingTasks(): Promise<Array<{ id: string; task_id: string }>> {
+  const candidates = await queryAll<{ id: string; scheduled_for: string }>(
     `SELECT t.id, t.scheduled_for
      FROM care_tasks t
      LEFT JOIN notifications n ON n.task_id = t.id
@@ -14,7 +14,7 @@ export function queueNotificationsForUpcomingTasks(): Array<{ id: string; task_i
   const out: Array<{ id: string; task_id: string }> = []
   for (const c of candidates) {
     const nid = randomUUID()
-    run(
+    await run(
       `INSERT INTO notifications (id, task_id, scheduled_for, status, channel) VALUES (?, ?, ?, 'queued', 'local')`,
       [nid, c.id, c.scheduled_for],
     )
@@ -23,7 +23,7 @@ export function queueNotificationsForUpcomingTasks(): Array<{ id: string; task_i
   return out
 }
 
-export function markQueuedNotificationsAsSent(): Array<{ id: string }> {
+export async function markQueuedNotificationsAsSent(): Promise<Array<{ id: string }>> {
   return queryAll<{ id: string }>(
     `UPDATE notifications
      SET status = 'sent', sent_at = datetime('now')

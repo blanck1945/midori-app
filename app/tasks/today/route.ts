@@ -18,6 +18,6 @@ export async function GET(request: NextRequest) {
       )
     ORDER BY t.scheduled_for ASC, t.priority DESC
   `
-  const rows = queryAll<Parameters<typeof mapTask>[0]>(sql, [user.id])
+  const rows = await queryAll<Parameters<typeof mapTask>[0]>(sql, [user.id])
   return NextResponse.json(rows.map(mapTask))
 }

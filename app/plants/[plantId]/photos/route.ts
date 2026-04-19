@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
   if (!user) return NextResponse.json({ message: 'Token faltante' }, { status: 401 })
 
   const { plantId } = await ctx.params
-  const ownership = queryOne<{ id: string }>('SELECT id FROM plants WHERE id = ? AND user_id = ?', [
+  const ownership = await queryOne<{ id: string }>('SELECT id FROM plants WHERE id = ? AND user_id = ?', [
     plantId,
     user.id,
   ])
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     return NextResponse.json({ message: 'Planta no encontrada' }, { status: 404 })
   }
 
-  const result = queryAll<{
+  const result = await queryAll<{
     id: string
     plant_id: string
     image_url: string
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   try {
     const payload = postSchema.parse(await request.json())
     const { plantId } = await ctx.params
-    const ownership = queryOne<{ id: string }>('SELECT id FROM plants WHERE id = ? AND user_id = ?', [
+    const ownership = await queryOne<{ id: string }>('SELECT id FROM plants WHERE id = ? AND user_id = ?', [
       plantId,
       user.id,
     ])
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       return NextResponse.json({ message: 'Planta no encontrada' }, { status: 404 })
     }
 
-    if (getPlantPhotoCount(plantId) >= MAX_PLANT_PHOTOS) {
+    if ((await getPlantPhotoCount(plantId)) >= MAX_PLANT_PHOTOS) {
       return NextResponse.json(
         { message: `Máximo ${MAX_PLANT_PHOTOS} fotos por planta` },
         { status: 409 },
@@ -90,12 +90,12 @@ export async function POST(request: NextRequest, ctx: Ctx) {
     }
 
     const id = randomUUID()
-    run(
+    await run(
       `INSERT INTO plant_photos (id, plant_id, image_url, note, context)
        VALUES (?, ?, ?, ?, ?)`,
       [id, plantId, storedUrl, payload.note ?? null, payload.context ?? null],
     )
-    const row = queryOne<{
+    const row = await queryOne<{
       id: string
       plant_id: string
       image_url: string
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
       captured_at: string
     }>('SELECT id, plant_id, image_url, note, context, captured_at FROM plant_photos WHERE id = ?', [id])!
 
-    return NextResponse.json(mapPlantPhoto(row), { status: 201 })
+    return NextResponse.json(mapPlantPhoto(row!), { status: 201 })
   } catch (error) {
     return NextResponse.json({ message: (error as Error).message }, { status: 400 })
   }

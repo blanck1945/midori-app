@@ -12,11 +12,13 @@ export function ensureScheduler() {
   started = true
 
   cron.schedule('*/5 * * * *', () => {
-    try {
-      queueNotificationsForUpcomingTasks()
-      markQueuedNotificationsAsSent()
-    } catch (error) {
-      console.error('Scheduler error:', (error as Error).message)
-    }
+    void (async () => {
+      try {
+        await queueNotificationsForUpcomingTasks()
+        await markQueuedNotificationsAsSent()
+      } catch (error) {
+        console.error('Scheduler error:', (error as Error).message)
+      }
+    })()
   })
 }

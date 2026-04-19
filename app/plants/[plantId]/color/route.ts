@@ -15,11 +15,11 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
   try {
     const { colorRgb } = schema.parse(await request.json())
     const { plantId } = await ctx.params
-    run(
+    await run(
       'UPDATE plants SET color_rgb = ?, updated_at = datetime(\'now\') WHERE id = ? AND user_id = ?',
       [colorRgb, plantId, user.id],
     )
-    const row = queryOne<Parameters<typeof mapPlant>[0]>(
+    const row = await queryOne<Parameters<typeof mapPlant>[0]>(
       'SELECT * FROM plants WHERE id = ? AND user_id = ?',
       [plantId, user.id],
     )
